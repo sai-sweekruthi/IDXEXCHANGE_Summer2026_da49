@@ -6,7 +6,16 @@ today = datetime.date.today()
 last_day_prev_month = today.replace(day=1) - datetime.timedelta(days=1)
 months = pd.date_range(start='2024-01', end=last_day_prev_month, freq='MS').strftime('%Y%m')
 
-# haven't addressed filled files yet
+# checks for filled data files, removes last 2 columns, then saves as name without "_filled"
+for prefix in ['CRMLSSold', 'CRMLSListing']:
+    for m in months:
+        filled_filename = f'data/{prefix}{m}_filled.csv'
+        normal_filename = f'data/{prefix}{m}.csv'
+        if os.path.exists(filled_filename):
+            df = pd.read_csv(filled_filename)
+            df = df.iloc[:, :-2]
+            df.to_csv(normal_filename, index=False)
+            print(f"Fixed {filled_filename} -> {normal_filename}")
 
 sold_months = []
 for m in months:
