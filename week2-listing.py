@@ -22,69 +22,70 @@ for prefix in ['CRMLSSold', 'CRMLSListing']:
             df.to_csv(normal_filename, index=False)
             print(f"Fixed {filled_filename} -> {normal_filename}")
 
-sold_months = []
+listing_months = []
 for m in months:
-    filename = f'data/CRMLSSold{m}.csv'
+    filename = f'data/CRMLSListing{m}.csv'
     try:
         data = pd.read_csv(filename)
-        sold_months.append(data)
+        listing_months.append(data)
     except FileNotFoundError:
         print(f"Skipped missing file: {filename}")
 
 
-sold_rows_before = sum(len(m) for m in sold_months)
-sold = pd.concat(sold_months, ignore_index=True)
-sold_rows_after = len(sold)
-print(f"Sold rows before concat: {sold_rows_before}, after concat: {sold_rows_after}")
+listing_rows_before = sum(len(m) for m in listing_months)
+listing = pd.concat(listing_months, ignore_index=True)
+listing_rows_after = len(listing)
+print(f"Listing rows before concat: {listing_rows_before}, after concat: {listing_rows_after}")
 
-sold_rows_before_filter = len(sold)
-sold_residential = sold[sold['PropertyType'] == 'Residential']
-sold_rows_after_filter = len(sold_residential)
-print(f"Sold rows before filter: {sold_rows_before_filter}, after filter: {sold_rows_after_filter}")
 
-sold_residential.to_csv('data/combined_sold_residential.csv', index=False)
+listing_rows_before_filter = len(listing)
+listing_residential = listing[listing['PropertyType'] == 'Residential']
+listing_rows_after_filter = len(listing_residential)
+print(f"Listing rows before filter: {listing_rows_before_filter}, after filter: {listing_rows_after_filter}")
+
+listing_residential.to_csv('data/combined_listing_residential.csv', index=False)
 
 #-----------------------------------------------------------
 # Week 2 - Dataset Structuring and Validation
 #-----------------------------------------------------------
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-sold = pd.read_csv("data/combined_sold_residential.csv")
+listing = pd.read_csv("data/combined_listing_residential.csv")
 
 # number of rows and columns
-print("Shape:", sold.shape)
+print("Shape:", listing.shape)
 # column names
-print("Columns:", sold.columns.tolist())
+print("Columns:", listing.columns.tolist())
 # preview first rows
-print(sold.head())
+print(listing.head())
 # column data types
-print(sold.dtypes)
+print(listing.dtypes)
 
 # drop duplicate columns with ".1"
-sold = sold.loc[:, ~sold.columns.str.endswith('.1')]
+listing = listing.loc[:, ~listing.columns.str.endswith('.1')]
 
 metadata_cols = [
-    'ListingKey', 'ListingKeyNumeric', 'ListingId', 'ListAgentEmail',
-    'ListAgentFirstName', 'ListAgentLastName', 'ListAgentFullName',
-    'CoListAgentFirstName', 'CoListAgentLastName', 'BuyerAgentMlsId',
-    'BuyerAgentFirstName', 'BuyerAgentLastName', 'ListOfficeName',
-    'BuyerOfficeName', 'CoListOfficeName', 'StreetNumberNumeric',
-    'UnparsedAddress', 'OriginatingSystemName', 'OriginatingSystemSubName',
+    'ListingKey', 'ListingKeyNumeric', 'ListingId', 'ListAgentFirstName',
+    'ListAgentLastName', 'ListAgentFullName', 'ListAgentEmail', 'BuyerAgentFirstName',
+    'BuyerAgentLastName', 'BuyerAgentMlsId', 'CoListAgentFirstName', 'CoListAgentLastName',
+    'ListOfficeName', 'BuyerOfficeName', 'CoListOfficeName', 'BuyerOfficeAOR',
+    'BuyerAgencyCompensation', 'BuyerAgencyCompensationType'
 ]
 
 # filter to residential properties only
-print("Unique property types:", sold['PropertyType'].unique())
-sold = sold[sold.PropertyType == 'Residential']
-print("Filtered shape:", sold.shape)
+print("Unique property types:", listing['PropertyType'].unique())
+listing = listing[listing.PropertyType == 'Residential']
+print("Filtered shape:", listing.shape)
 
 ## missing value analysis
 
 # identify high missing columns
-missing_count = sold.isnull().sum()
-missing_pct = (sold.isnull().mean() * 100).round(2)
+missing_count = listing.isnull().sum()
+missing_pct = (listing.isnull().mean() * 100).round(2)
 
 missing_report = pd.DataFrame({
     'MissingCount': missing_count,
@@ -100,7 +101,7 @@ print("\nMissing Value Report:")
 print(missing_report)
 high_missing_cols = missing_report[missing_report['MissingPct'] > 90].index.tolist()
 drop_cols = metadata_cols + high_missing_cols
-sold = sold.drop(columns=[c for c in drop_cols if c in sold.columns]) # dropped the unnecessary columns
+listing = listing.drop(columns=[c for c in drop_cols if c in listing.columns]) # dropped the unnecessary columns
 
 ## numeric distribution review
 
@@ -111,7 +112,7 @@ numeric_fields = [
 ]
 
 # percentile summaries
-percentiles = sold[numeric_fields].describe(percentiles=[0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99])
+percentiles = listing[numeric_fields].describe(percentiles=[0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99])
 print(percentiles)
 
 percentile_cutoffs = {
@@ -123,9 +124,9 @@ percentile_cutoffs = {
 # print histograms with outliers
 for col in percentile_cutoffs.keys():
     fig, axes = plt.subplots(1, 2, figsize=(14, 4))
-    sns.histplot(sold[col], kde=True, ax=axes[0])
+    sns.histplot(listing[col], kde=True, ax=axes[0])
     axes[0].set_title(f"{col} Distribution (With Outliers)")
-    sns.boxplot(x=sold[col], ax=axes[1])
+    sns.boxplot(x=listing[col], ax=axes[1])
     axes[1].set_title(f"{col} Boxplot (With Outliers)")
     plt.tight_layout()
     plt.show()
@@ -134,8 +135,8 @@ for col in percentile_cutoffs.keys():
 outlier_indices = {}
 
 for col, cutoff in percentile_cutoffs.items():
-    threshold = sold[col].quantile(cutoff)
-    outliers = sold[sold[col] > threshold]
+    threshold = listing[col].quantile(cutoff)
+    outliers = listing[listing[col] > threshold]
     outlier_indices[col] = outliers.index.tolist()
 
     print(f"\n{col} — cutoff at {cutoff} percentile = {threshold:.2f}")
@@ -148,7 +149,7 @@ def remove_outliers(series, cutoff):
 
 # histograms without outliers
 for col, cutoff in percentile_cutoffs.items():
-    trimmed = remove_outliers(sold[col], cutoff)
+    trimmed = remove_outliers(listing[col], cutoff)
     fig, axes = plt.subplots(1, 2, figsize=(14, 4))
     sns.histplot(trimmed, kde=True, ax=axes[0])
     axes[0].set_title(f"{col} Distribution (Outliers Removed at {cutoff} percentile)")
@@ -157,4 +158,4 @@ for col, cutoff in percentile_cutoffs.items():
     plt.tight_layout()
     plt.show()
 
-sold.to_csv('data/combined_sold_residential_eda.csv', index=False)
+listing.to_csv('data/combined_listing_residential_eda.csv', index=False)
